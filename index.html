@@ -45,6 +45,7 @@
 </head>
 <body>
     <div id="score">Score: 0</div>
+    <div id="lives">Lives: 3</div>
     <canvas id="gameCanvas"></canvas>
     <button id="restart">Restart Game</button>
     <script>
@@ -53,6 +54,7 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreDisplay = document.getElementById('score');
+        const livesDisplay = document.getElementById('lives');
         const restartButton = document.getElementById('restart');
 
         // Responsive canvas sizing
@@ -75,6 +77,7 @@
         window.addEventListener('resize', resizeCanvas);
 
         let score = 0;
+        let lives = 3;
         let gameOver = false;
         let animationFrameId = null;
 
@@ -133,8 +136,10 @@
         // Restart button with click and touchend support
         function restartGame() {
             score = 0;
+            lives = 3;
             gameOver = false;
             scoreDisplay.textContent = `Score: ${score}`;
+            livesDisplay.textContent = `Lives: ${lives}`;
             basket.x = canvas.width / 2 - 50;
             fruit.speed = 3; // Reset fruit speed
             resetFruit();
@@ -196,9 +201,15 @@
 
             // Check if fruit hits the ground
             if (fruit.y > canvas.height) {
-                gameOver = true;
-                restartButton.style.display = 'block';
-                cancelAnimationFrame(animationFrameId);
+                lives--;
+                livesDisplay.textContent = `Lives: ${lives}`;
+                if (lives === 0) {
+                    gameOver = true;
+                    restartButton.style.display = 'block';
+                    cancelAnimationFrame(animationFrameId);
+                } else {
+                    resetFruit();
+                }
             }
         }
 
