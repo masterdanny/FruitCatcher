@@ -6,25 +6,27 @@
     <title>Catch the Fruit</title>
     <style>
         body {
+            background-color: #121212;
+            color: #ffffff;
             text-align: center;
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
             overflow: hidden;
         }
-        #score {
+        #score, #highScore, #lives {
             font-size: 24px;
             margin: 10px;
         }
         #gameCanvas {
-            border: 1px solid black;
+            border: 1px solid #ffffff;
             display: block;
             margin: 0 auto;
-            background-color: #f0f8ff;
+            background-color: #282c34;
             max-width: 100%;
             max-height: 100vh;
         }
-        #restart {
+        #restart, #pause, #resume {
             display: none;
             margin: 20px auto;
             padding: 10px 20px;
@@ -32,30 +34,36 @@
             cursor: pointer;
             z-index: 1000; /* Ensure button is above canvas */
             position: relative;
-            background-color: #4CAF50;
+            background-color: #1a7e20;
             color: white;
             border: none;
             border-radius: 5px;
             touch-action: manipulation; /* Prevent touch interference */
         }
-        #restart:hover {
-            background-color: #45a049;
+        #restart:hover, #pause:hover, #resume:hover {
+            background-color: #166d1c;
         }
     </style>
 </head>
 <body>
     <div id="score">Score: 0</div>
+    <div id="highScore">High Score: 0</div>
     <div id="lives">Lives: 3</div>
     <canvas id="gameCanvas"></canvas>
     <button id="restart">Restart Game</button>
+    <button id="pause">Pause</button>
+    <button id="resume" style="display: none;">Resume</button>
     <script>
         'use strict';
 
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreDisplay = document.getElementById('score');
+        const highScoreDisplay = document.getElementById('highScore');
         const livesDisplay = document.getElementById('lives');
         const restartButton = document.getElementById('restart');
+        const pauseButton = document.getElementById('pause');
+        const resumeButton = document.getElementById('resume');
 
         // Responsive canvas sizing
         function resizeCanvas() {
@@ -77,27 +85,111 @@
         window.addEventListener('resize', resizeCanvas);
 
         let score = 0;
+        let highScore = localStorage.getItem('fruitCatcherHighScore') || 0;
         let lives = 3;
         let gameOver = false;
+        let isPaused = false;
         let animationFrameId = null;
+
+        highScoreDisplay.textContent = `High Score: ${highScore}`;
+
+        let audioCtx;
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch(e) {
+            console.warn("Web Audio API is not supported in this browser");
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'catch') {
+                oscillator.frequency.value = 800;
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+            } else if (type === 'miss') {
+                oscillator.type = 'square';
+                oscillator.frequency.value = 100;
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+            } else if (type === 'gameOver') {
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.value = 150;
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+            } else if (type === 'life') {
+                oscillator.frequency.value = 1200;
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+            }
+            
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.5);
+        }
+
+        document.body.addEventListener('click', () => {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }, { once: true });
+        document.body.addEventListener('keydown', () => {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }, { once: true });
+        document.body.addEventListener('touchstart', () => {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }, { once: true });
 
         // Basket
         const basket = {
             x: canvas.width / 2 - 50,
-            y: canvas.height - 50,
+            y: canvas.height - 30,
             width: 100,
-            height: 50,
+            height: 30,
             speed: 10
         };
 
-        // Fruit
-        const fruit = {
-            x: Math.random() * (canvas.width - 30),
-            y: 0,
-            width: 30,
-            height: 30,
-            speed: window.innerWidth > 1200 ? 5 : 3
-        };
+        const fruitChars = ['🍎', '🍊', '🍌', '🍉', '🍇', '🍓'];
+        let fruits = [];
+        const fruitWidth = 30;
+        const fruitHeight = 30;
+        let fruitSpawnTimer = 0;
+
+
+        function createFruit() {
+            const rand = Math.random();
+            let char;
+            let type;
+
+            if (rand < 0.05) { // 5% chance for a heart
+                char = '❤️';
+                type = 'life';
+            } else if (rand < 0.25) { // 20% chance for a bomb (0.05 + 0.20)
+                char = '💣';
+                type = 'bomb';
+            } else { // 75% chance for a fruit
+                char = fruitChars[Math.floor(Math.random() * fruitChars.length)];
+                type = 'fruit';
+            }
+
+            fruits.push({
+                x: Math.random() * (canvas.width - fruitWidth),
+                y: 0,
+                width: fruitWidth,
+                height: fruitHeight,
+                speed: (window.innerWidth > 1200 ? 4 : 2) + Math.random() * 2,
+                char: char,
+                type: type
+            });
+        }
 
         // Input handling
         let leftPressed = false;
@@ -105,8 +197,24 @@
 
         // Keyboard controls
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowLeft') leftPressed = true;
-            if (e.key === 'ArrowRight') rightPressed = true;
+            if (e.key === 'ArrowLeft') {
+                leftPressed = true;
+            } else if (e.key === 'ArrowRight') {
+                rightPressed = true;
+            } else if (e.code === 'Space') {
+                e.preventDefault(); // Prevent page scroll
+                if (gameOver) {
+                    restartGame();
+                } else {
+                    if (isPaused) {
+                        resumeButton.click();
+                    } else {
+                        pauseButton.click();
+                    }
+                }
+            } else if (e.key === 'r' || e.key === 'R') {
+                restartGame();
+            }
         });
 
         document.addEventListener('keyup', (e) => {
@@ -135,15 +243,20 @@
 
         // Restart button with click and touchend support
         function restartGame() {
+            cancelAnimationFrame(animationFrameId); // Stop the old game loop
             score = 0;
             lives = 3;
             gameOver = false;
+            isPaused = false;
             scoreDisplay.textContent = `Score: ${score}`;
             livesDisplay.textContent = `Lives: ${lives}`;
             basket.x = canvas.width / 2 - 50;
-            fruit.speed = window.innerWidth > 1200 ? 5 : 3; // Reset fruit speed
-            resetFruit();
+            fruits = [];
+            fruitSpawnTimer = 0;
+            createFruit(); // Start with one fruit
             restartButton.style.display = 'none';
+            pauseButton.style.display = 'inline-block';
+            resumeButton.style.display = 'none';
             draw();
         }
 
@@ -153,23 +266,48 @@
             restartGame();
         });
 
+        pauseButton.addEventListener('click', () => {
+            if (!gameOver) {
+                isPaused = true;
+                pauseButton.style.display = 'none';
+                resumeButton.style.display = 'inline-block';
+                // Stop the game loop
+                cancelAnimationFrame(animationFrameId);
+            }
+        });
+
+        resumeButton.addEventListener('click', () => {
+            if (!gameOver) {
+                isPaused = false;
+                pauseButton.style.display = 'inline-block';
+                resumeButton.style.display = 'none';
+                // Resume the game loop
+                draw();
+            }
+        });
+
         function drawBasket() {
             try {
-                ctx.fillStyle = 'brown';
+                // Basket body
+                ctx.fillStyle = '#8B4513'; // SaddleBrown
                 ctx.fillRect(basket.x, basket.y, basket.width, basket.height);
+
+                // Basket rim
+                ctx.fillStyle = '#A0522D'; // Sienna
+                ctx.fillRect(basket.x - 5, basket.y, basket.width + 10, 10);
             } catch (e) {
                 console.error('Error drawing basket:', e);
             }
         }
 
-        function drawFruit() {
-            try {
-                ctx.fillStyle = 'red';
-                ctx.beginPath();
-                ctx.arc(fruit.x + fruit.width / 2, fruit.y + fruit.height / 2, fruit.width / 2, 0, Math.PI * 2);
-                ctx.fill();
-            } catch (e) {
-                console.error('Error drawing fruit:', e);
+        function drawFruits() {
+            for (const fruit of fruits) {
+                try {
+                    ctx.font = `${fruit.width}px serif`;
+                    ctx.fillText(fruit.char, fruit.x, fruit.y + fruit.height);
+                } catch (e) {
+                    console.error('Error drawing fruit:', e);
+                }
             }
         }
 
@@ -182,47 +320,84 @@
             }
         }
 
-        function updateFruit() {
+        function updateFruits() {
             if (gameOver) return;
 
-            fruit.y += fruit.speed;
-
-            // Check if fruit touches basket (rectangle-rectangle collision)
-            if (
-                fruit.x + fruit.width > basket.x &&
-                fruit.x < basket.x + basket.width &&
-                fruit.y + fruit.height > basket.y &&
-                fruit.y < basket.y + basket.height
-            ) {
-                score += 10;
-                scoreDisplay.textContent = `Score: ${score}`;
-                resetFruit();
+            // Spawn new fruits
+            fruitSpawnTimer++;
+            if (fruitSpawnTimer > 80) { // Spawn a new fruit every 80 frames
+                createFruit();
+                fruitSpawnTimer = 0;
             }
 
-            // Check if fruit hits the ground
-            if (fruit.y > canvas.height) {
-                lives--;
-                livesDisplay.textContent = `Lives: ${lives}`;
-                if (lives === 0) {
-                    gameOver = true;
-                    restartButton.style.display = 'block';
-                    cancelAnimationFrame(animationFrameId);
-                } else {
-                    resetFruit();
+
+            for (let i = fruits.length - 1; i >= 0; i--) {
+                const fruit = fruits[i];
+                fruit.y += fruit.speed;
+
+                // Check if fruit is caught
+                if (
+                    fruit.x + fruit.width > basket.x &&
+                    fruit.x < basket.x + basket.width &&
+                    fruit.y + fruit.height > basket.y &&
+                    fruit.y < basket.y + basket.height
+                ) {
+                    if (fruit.type === 'fruit') {
+                        score += 10;
+                        scoreDisplay.textContent = `Score: ${score}`;
+                        playSound('catch');
+                    } else if (fruit.type === 'bomb') {
+                        lives--;
+                        livesDisplay.textContent = `Lives: ${lives}`;
+                        playSound('miss');
+                    } else if (fruit.type === 'life') {
+                        lives++;
+                        livesDisplay.textContent = `Lives: ${lives}`;
+                        playSound('life');
+                    }
+                    fruits.splice(i, 1);
+                }
+                // Check if fruit is missed
+                else if (fruit.y > canvas.height) {
+                    if (fruit.type === 'fruit') {
+                        lives--;
+                        livesDisplay.textContent = `Lives: ${lives}`;
+                        playSound('miss');
+                    }
+                    // if it's a bomb and it's missed, nothing happens.
+                    fruits.splice(i, 1);
                 }
             }
+
+            if (lives <= 0 && !gameOver) {
+                gameOver = true;
+                if (score > highScore) {
+                    highScore = score;
+                    localStorage.setItem('fruitCatcherHighScore', highScore);
+                    highScoreDisplay.textContent = `High Score: ${highScore}`;
+                }
+                playSound('gameOver');
+                restartButton.style.display = 'block';
+                pauseButton.style.display = 'none';
+                resumeButton.style.display = 'none';
+                cancelAnimationFrame(animationFrameId);
+            }
         }
 
-        function resetFruit() {
-            fruit.x = Math.random() * (canvas.width - fruit.width);
-            fruit.y = 0;
-            fruit.speed += 0.1;
-        }
 
         function draw() {
+            if (isPaused) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white';
+                ctx.font = `${Math.min(canvas.width / 10, 60)}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.fillText('Paused', canvas.width / 2, canvas.height / 2);
+                return;
+            }
             if (gameOver) {
                 try {
-                    ctx.fillStyle = 'black';
+                    ctx.fillStyle = 'white';
                     ctx.font = `${Math.min(canvas.width / 16, 48)}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.fillText('Game Over!', canvas.width / 2, canvas.height / 2);
@@ -236,9 +411,9 @@
             try {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 drawBasket();
-                drawFruit();
+                drawFruits();
                 updateBasket();
-                updateFruit();
+                updateFruits();
                 animationFrameId = requestAnimationFrame(draw);
             } catch (e) {
                 console.error('Error in game loop:', e);
@@ -247,6 +422,8 @@
         }
 
         // Start the game
+        createFruit();
+        pauseButton.style.display = 'inline-block';
         draw();
     </script>
 </body>
