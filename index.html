@@ -90,6 +90,7 @@
         let gameOver = false;
         let isPaused = false;
         let animationFrameId = null;
+        let activeAnimations = [];
 
         highScoreDisplay.textContent = `High Score: ${highScore}`;
 
@@ -253,6 +254,7 @@
             basket.x = canvas.width / 2 - 50;
             fruits = [];
             fruitSpawnTimer = 0;
+            activeAnimations = []; // Clear animations on restart
             createFruit(); // Start with one fruit
             restartButton.style.display = 'none';
             pauseButton.style.display = 'inline-block';
@@ -355,6 +357,15 @@
                         livesDisplay.textContent = `Lives: ${lives}`;
                         playSound('life');
                     }
+                    // Create animation for caught item
+                    activeAnimations.push({
+                        x: fruit.x,
+                        y: fruit.y,
+                        char: fruit.char,
+                        type: fruit.type, // 'fruit', 'bomb', or 'life'
+                        start_time: performance.now(),
+                        duration: 300 // milliseconds for animation
+                    });
                     fruits.splice(i, 1);
                 }
                 // Check if fruit is missed
@@ -381,6 +392,31 @@
                 pauseButton.style.display = 'none';
                 resumeButton.style.display = 'none';
                 cancelAnimationFrame(animationFrameId);
+            }
+        }
+
+        function drawAnimations() {
+            const currentTime = performance.now();
+            for (let i = activeAnimations.length - 1; i >= 0; i--) {
+                const anim = activeAnimations[i];
+                const elapsed = currentTime - anim.start_time;
+                const progress = elapsed / anim.duration;
+
+                if (progress >= 1) {
+                    activeAnimations.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.font = `${fruitWidth + (fruitWidth * progress * 0.5)}px serif`; // Expand slightly
+                ctx.textAlign = 'center';
+                ctx.globalAlpha = 1 - progress; // Fade out
+
+                // Adjust position slightly to center the expanding character
+                const currentX = anim.x + fruitWidth / 2;
+                const currentY = anim.y + fruitHeight / 2 - (fruitHeight * progress * 0.5); // Move up slightly
+                ctx.fillText(anim.char, currentX, currentY);
+                ctx.restore();
             }
         }
 
@@ -414,6 +450,7 @@
                 drawFruits();
                 updateBasket();
                 updateFruits();
+                drawAnimations(); // Draw active animations
                 animationFrameId = requestAnimationFrame(draw);
             } catch (e) {
                 console.error('Error in game loop:', e);
