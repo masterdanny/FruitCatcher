@@ -91,6 +91,8 @@
         let isPaused = false;
         let animationFrameId = null;
         let activeAnimations = [];
+        let isSlowMoActive = false;
+        let slowMoTimer = 0;
 
         highScoreDisplay.textContent = `High Score: ${highScore}`;
 
@@ -175,6 +177,7 @@
 
 
         function createFruit() {
+            const difficultyFactor = 1 + Math.floor(score / 100) * 0.1;
             const rand = Math.random();
             let char;
             let type;
@@ -185,13 +188,16 @@
             } else if (rand < 0.06) { // 3% chance for shrink
                 char = '💨';
                 type = 'shrink';
-            } else if (rand < 0.11) { // 5% chance for a heart
+            } else if (rand < 0.09) { // 3% chance for slowmo
+                char = '🥶';
+                type = 'slowmo';
+            } else if (rand < 0.12) { // 3% chance for a heart
                 char = '❤️';
                 type = 'life';
-            } else if (rand < 0.26) { // 15% chance for a bomb
+            } else if (rand < 0.27) { // 15% chance for a bomb
                 char = '💣';
                 type = 'bomb';
-            } else { // 74% chance for a fruit
+            } else { // 73% chance for a fruit
                 char = fruitChars[Math.floor(Math.random() * fruitChars.length)];
                 type = 'fruit';
             }
@@ -201,7 +207,7 @@
                 y: 0,
                 width: fruitWidth,
                 height: fruitHeight,
-                speed: (window.innerWidth > 1200 ? 4 : 2) + Math.random() * 2,
+                speed: ((window.innerWidth > 1200 ? 4 : 2) + Math.random() * 2) * difficultyFactor,
                 char: char,
                 type: type
             });
@@ -265,6 +271,8 @@
             lives = 3;
             gameOver = false;
             isPaused = false;
+            isSlowMoActive = false;
+            slowMoTimer = 0;
             scoreDisplay.textContent = `Score: ${score}`;
             livesDisplay.textContent = `Lives: ${lives}`;
             basket.x = canvas.width / 2 - 50;
@@ -346,8 +354,9 @@
             if (gameOver) return;
 
             // Spawn new fruits
+            const spawnRate = Math.max(30, 80 - Math.floor(score / 50)); // Decrease spawn timer as score increases, with a minimum of 30
             fruitSpawnTimer++;
-            if (fruitSpawnTimer > 80) { // Spawn a new fruit every 80 frames
+            if (fruitSpawnTimer > spawnRate) { // Spawn a new fruit every 80 frames
                 createFruit();
                 fruitSpawnTimer = 0;
             }
@@ -355,7 +364,7 @@
 
             for (let i = fruits.length - 1; i >= 0; i--) {
                 const fruit = fruits[i];
-                fruit.y += fruit.speed;
+                fruit.y += isSlowMoActive ? fruit.speed / 2 : fruit.speed;
 
                 // Check if fruit is caught
                 if (
@@ -387,6 +396,10 @@
                         } else { // shrink
                             basket.width = basket.originalWidth * 0.5;
                         }
+                        playSound('powerup');
+                    } else if (fruit.type === 'slowmo') {
+                        isSlowMoActive = true;
+                        slowMoTimer = 300; // 5 seconds at 60fps
                         playSound('powerup');
                     }
                     // Create animation for caught item
@@ -498,6 +511,12 @@
                     basket.isPoweredUp = false;
                     basket.powerUpType = null;
                     basket.width = basket.originalWidth;
+                }
+            }
+            if (isSlowMoActive) {
+                slowMoTimer--;
+                if (slowMoTimer <= 0) {
+                    isSlowMoActive = false;
                 }
             }
         }
