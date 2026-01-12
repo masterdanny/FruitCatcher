@@ -68,8 +68,8 @@
         // Responsive canvas sizing
         function resizeCanvas() {
             const maxWidth = window.innerWidth * 0.95;
-            const maxHeight = window.innerHeight * 0.8;
-            const aspectRatio = 800 / 600;
+            const maxHeight = window.innerHeight * 0.95;
+            const aspectRatio = window.innerHeight > window.innerWidth ? 3 / 4 : 4 / 3;
             let width = maxWidth;
             let height = width / aspectRatio;
 
