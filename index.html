@@ -65,11 +65,27 @@
         const pauseButton = document.getElementById('pause');
         const resumeButton = document.getElementById('resume');
 
+        // Basket (initialized with dummy values, actual values set by resizeCanvas)
+        const basket = {
+            x: 0,
+            y: 0,
+            width: 100, // Will be updated by resizeCanvas
+            height: 30,
+            speed: 10,
+            originalWidth: 100, // Will be updated by resizeCanvas
+            isPoweredUp: false,
+            powerUpType: null,
+            powerUpTimer: 0
+        };
+
         // Responsive canvas sizing
         function resizeCanvas() {
             const maxWidth = window.innerWidth * 0.95;
             const maxHeight = window.innerHeight * 0.95;
-            const aspectRatio = window.innerHeight > window.innerWidth ? 3 / 4 : 4 / 3;
+            // Decreased height by 10% => increased aspect ratio by 10%
+            // old portrait aspect ratio = 3/4 = 0.75
+            // new portrait aspect ratio = 0.75 / 0.9 = 0.8333... = 5/6
+            const aspectRatio = window.innerHeight > window.innerWidth ? 5 / 6 : 4 / 3;
             let width = maxWidth;
             let height = width / aspectRatio;
 
@@ -80,9 +96,27 @@
 
             canvas.width = width;
             canvas.height = height;
+
+            // Update basket properties based on new canvas size
+            const newOriginalWidth = canvas.width / 8; // Responsive basket width
+            basket.originalWidth = newOriginalWidth;
+
+            if (basket.isPoweredUp) {
+                if (basket.powerUpType === 'grow') {
+                    basket.width = newOriginalWidth * 1.5;
+                } else if (basket.powerUpType === 'shrink') {
+                    basket.width = newOriginalWidth * 0.5;
+                }
+            } else {
+                basket.width = newOriginalWidth;
+            }
+            // Recenter the basket horizontally
+            basket.x = canvas.width / 2 - basket.width / 2;
+            // Keep the basket at the bottom
+            basket.y = canvas.height - 30;
         }
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas(); // Initial call to set canvas and basket properties
+        window.addEventListener('resize', resizeCanvas); // Listen for future resizes
 
         let score = 0;
         let highScore = localStorage.getItem('fruitCatcherHighScore') || 0;
@@ -155,19 +189,6 @@
                 audioCtx.resume();
             }
         }, { once: true });
-
-        // Basket
-        const basket = {
-            x: canvas.width / 2 - 50,
-            y: canvas.height - 30,
-            width: 100,
-            height: 30,
-            speed: 10,
-            originalWidth: 100,
-            isPoweredUp: false,
-            powerUpType: null,
-            powerUpTimer: 0
-        };
 
         const fruitChars = ['🍎', '🍊', '🍌', '🍉', '🍇', '🍓'];
         let fruits = [];
