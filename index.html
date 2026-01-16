@@ -130,13 +130,27 @@
 
             draw(ctx) {
                 try {
-                    // Basket body
-                    ctx.fillStyle = '#8B4513'; // SaddleBrown
-                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
 
-                    // Basket rim
+                    // Main basket body
+                    ctx.fillStyle = '#8B4513'; // SaddleBrown
+                    ctx.beginPath();
+                    ctx.moveTo(0, this.height);
+                    ctx.lineTo(this.width, this.height);
+                    ctx.quadraticCurveTo(this.width * 0.9, 0, this.width * 0.7, 0);
+                    ctx.lineTo(this.width * 0.3, 0);
+                    ctx.quadraticCurveTo(this.width * 0.1, 0, 0, this.height);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Basket rim (top edge)
                     ctx.fillStyle = '#A0522D'; // Sienna
-                    ctx.fillRect(this.x - 5, this.y, this.width + 10, 10);
+                    ctx.beginPath();
+                    ctx.ellipse(this.width / 2, 5, this.width / 2, 5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.restore();
                 } catch (e) {
                     console.error('Error drawing basket:', e);
                 }
