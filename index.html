@@ -155,6 +155,15 @@
                     ctx.save();
                     ctx.translate(this.x, this.y);
 
+                    if (this.isPoweredUp) {
+                        ctx.shadowBlur = 20;
+                        if (this.powerUpType === 'grow') {
+                            ctx.shadowColor = 'green';
+                        } else if (this.powerUpType === 'shrink') {
+                            ctx.shadowColor = 'red';
+                        }
+                    }
+
                     // Main basket body
                     ctx.fillStyle = '#8B4513'; // SaddleBrown
                     ctx.beginPath();
@@ -228,6 +237,7 @@
                 this.fruitSpawnTimer = 0;
                 this.leftPressed = false;
                 this.rightPressed = false;
+                this.screenShakeTime = 0;
 
                 this.highScoreDisplay.textContent = `High Score: ${this.highScore}`;
 
@@ -366,6 +376,7 @@
                 this.fruits = [];
                 this.fruitSpawnTimer = 0;
                 this.activeAnimations = [];
+                this.screenShakeTime = 0;
                 this.createFruit();
                 this.restartButton.style.display = 'none';
                 this.pauseButton.style.display = 'inline-block';
@@ -443,6 +454,7 @@
                             this.combo = 1;
                             this.comboDisplay.textContent = `Combo: ${this.combo}x`;
                             this.playSound('miss');
+                            this.screenShakeTime = 15;
                         } else if (fruit.type === 'life') {
                             this.lives++;
                             this.livesDisplay.textContent = `Lives: ${this.lives}`;
@@ -557,6 +569,14 @@
                 }
 
                 try {
+                    this.ctx.save();
+                    if (this.screenShakeTime > 0) {
+                        this.screenShakeTime--;
+                        const shakeX = (Math.random() - 0.5) * 10;
+                        const shakeY = (Math.random() - 0.5) * 10;
+                        this.ctx.translate(shakeX, shakeY);
+                    }
+
                     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
                     this.basket.draw(this.ctx);
                     this.drawFruits();
@@ -564,6 +584,8 @@
                     this.basket.update(this.leftPressed, this.rightPressed);
                     this.updateFruits();
                     this.drawAnimations();
+
+                    this.ctx.restore();
                     this.animationFrameId = requestAnimationFrame(this.draw);
                 } catch (e) {
                     console.error('Error in game loop:', e);
