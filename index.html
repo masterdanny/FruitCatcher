@@ -74,24 +74,37 @@
 
             calculateSpeed() {
                 const difficultyFactor = 1 + Math.floor(this.score / 100) * 0.1;
-                return ((window.innerWidth > 1200 ? 4 : 2) + Math.random() * 2) * difficultyFactor;
+                let speed = ((window.innerWidth > 1200 ? 4 : 2) + Math.random() * 2) * difficultyFactor;
+                if (this.type === 'golden') {
+                    speed *= 1.5;
+                }
+                return speed;
             }
 
             setRandomType() {
                 const rand = Math.random();
-                if (rand < 0.03) {
+                if (rand < 0.02) {
+                    this.char = '🌟';
+                    this.type = 'golden';
+                } else if (rand < 0.05) {
                     this.char = '✨';
                     this.type = 'grow';
-                } else if (rand < 0.06) {
+                } else if (rand < 0.08) {
                     this.char = '💨';
                     this.type = 'shrink';
-                } else if (rand < 0.09) {
+                } else if (rand < 0.11) {
                     this.char = '🥶';
                     this.type = 'slowmo';
-                } else if (rand < 0.12) {
+                } else if (rand < 0.14) {
                     this.char = '❤️';
                     this.type = 'life';
-                } else if (rand < 0.27) {
+                } else if (rand < 0.17) {
+                    this.char = '2x';
+                    this.type = 'scoreMultiplier';
+                } else if (rand < 0.20) {
+                    this.char = '🧲';
+                    this.type = 'magnet';
+                } else if (rand < 0.35) {
                     this.char = '💣';
                     this.type = 'bomb';
                 } else {
@@ -109,8 +122,17 @@
                 }
             }
 
-            update(isSlowMoActive) {
+            update(isSlowMoActive, isMagnetActive, basketX) {
                 this.y += isSlowMoActive ? this.speed / 2 : this.speed;
+
+                if (isMagnetActive && this.type === 'fruit') {
+                    const basketCenter = basketX;
+                    if (this.x < basketCenter) {
+                        this.x += 2;
+                    } else {
+                        this.x -= 2;
+                    }
+                }
             }
         }
 
@@ -197,6 +219,10 @@
                 this.activeAnimations = [];
                 this.isSlowMoActive = false;
                 this.slowMoTimer = 0;
+                this.isScoreMultiplierActive = false;
+                this.scoreMultiplierTimer = 0;
+                this.isMagnetActive = false;
+                this.magnetTimer = 0;
                 this.fruitChars = ['🍎', '🍊', '🍌', '🍉', '🍇', '🍓'];
                 this.fruits = [];
                 this.fruitSpawnTimer = 0;
@@ -331,6 +357,8 @@
                 this.isPaused = false;
                 this.isSlowMoActive = false;
                 this.slowMoTimer = 0;
+                this.isScoreMultiplierActive = false;
+                this.scoreMultiplierTimer = 0;
                 this.scoreDisplay.textContent = `Score: ${this.score}`;
                 this.livesDisplay.textContent = `Lives: ${this.lives}`;
                 this.comboDisplay.textContent = `Combo: ${this.combo}x`;
@@ -389,7 +417,7 @@
 
                 for (let i = this.fruits.length - 1; i >= 0; i--) {
                     const fruit = this.fruits[i];
-                    fruit.update(this.isSlowMoActive);
+                    fruit.update(this.isSlowMoActive, this.isMagnetActive, this.basket.x + this.basket.width / 2);
 
                     if (
                         fruit.x + fruit.width > this.basket.x &&
@@ -398,7 +426,13 @@
                         fruit.y < this.basket.y + this.basket.height
                     ) {
                         if (fruit.type === 'fruit') {
-                            this.score += 10 * this.combo;
+                            this.score += (this.isScoreMultiplierActive ? 2 : 1) * 10 * this.combo;
+                            this.combo++;
+                            this.comboDisplay.textContent = `Combo: ${this.combo}x`;
+                            this.scoreDisplay.textContent = `Score: ${this.score}`;
+                            this.playSound('catch');
+                        } else if (fruit.type === 'golden') {
+                            this.score += 100;
                             this.combo++;
                             this.comboDisplay.textContent = `Combo: ${this.combo}x`;
                             this.scoreDisplay.textContent = `Score: ${this.score}`;
@@ -427,6 +461,14 @@
                         } else if (fruit.type === 'slowmo') {
                             this.isSlowMoActive = true;
                             this.slowMoTimer = 300;
+                            this.playSound('powerup');
+                        } else if (fruit.type === 'scoreMultiplier') {
+                            this.isScoreMultiplierActive = true;
+                            this.scoreMultiplierTimer = 300;
+                            this.playSound('powerup');
+                        } else if (fruit.type === 'magnet') {
+                            this.isMagnetActive = true;
+                            this.magnetTimer = 300;
                             this.playSound('powerup');
                         }
                         this.activeAnimations.push({
@@ -542,6 +584,18 @@
                     this.slowMoTimer--;
                     if (this.slowMoTimer <= 0) {
                         this.isSlowMoActive = false;
+                    }
+                }
+                if (this.isScoreMultiplierActive) {
+                    this.scoreMultiplierTimer--;
+                    if (this.scoreMultiplierTimer <= 0) {
+                        this.isScoreMultiplierActive = false;
+                    }
+                }
+                if (this.isMagnetActive) {
+                    this.magnetTimer--;
+                    if (this.magnetTimer <= 0) {
+                        this.isMagnetActive = false;
                     }
                 }
             }
